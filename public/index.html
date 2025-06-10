@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Generator Benchmark</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Tailwind CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Dark mode config -->
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              background: "#0f0f0f",
+              foreground: "#ffffff",
+              muted: "#1e1e1e",
+              border: "#2c2c2c",
+            },
+          },
+        },
+      };
+    </script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+  </head>
+
+  <body
+    class="bg-background text-foreground min-h-screen flex flex-col items-center px-4 py-10 space-y-8"
+  >
+    <h1 class="text-3xl font-bold">🧪 Generator Benchmark</h1>
+
+    <button
+      id="runBtn"
+      class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-lg transition disabled:opacity-50"
+    >
+      Run Performance Test
+    </button>
+
+    <div class="w-full max-w-4xl bg-muted p-6 rounded-lg shadow">
+      <canvas id="combinedChart" class="w-full h-96"></canvas>
+    </div>
+
+    <div class="w-full max-w-4xl bg-muted p-6 rounded-lg shadow">
+      <h2 class="text-xl font-semibold mb-4">Raw JSON Output</h2>
+      <pre
+        id="jsonOutput"
+        class="bg-background p-4 rounded overflow-x-auto text-sm border border-border whitespace-pre-wrap"
+      >
+Run the test to see JSON data here...
+      </pre>
+    </div>
+
+    <script>
+      const ctx = document.getElementById("combinedChart").getContext("2d");
+      Chart.register(ChartDataLabels);
+      const chart = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: ["Dump", "Stream"],
+          datasets: [
+            {
+              label: "Time (ms)",
+              backgroundColor: "rgba(255, 99, 132, 0.7)",
+              data: [],
+            },
+            {
+              label: "Peak Memory (MB)",
+              backgroundColor: "rgba(54, 162, 235, 0.7)",
+              data: [],
+            },
+            {
+              label: "Avg Memory (MB)",
+              backgroundColor: "rgba(75, 192, 192, 0.7)",
+              data: [],
+            },
+          ],
+        },
+        plugins: [ChartDataLabels],
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { color: "#ffffff" },
+            },
+            x: {
+              ticks: { color: "#ffffff" },
+            },
+          },
+          plugins: {
+            legend: {
+              labels: {
+                color: "#ffffff",
+              },
+            },
+            datalabels: {
+              anchor: "end",
+              align: "top",
+              color: "#fff",
+              font: {
+                weight: "bold",
+                size: 12,
+              },
+              formatter: function (value, context) {
+                const label = context.dataset.label || "";
+
+                if (label.toLowerCase().includes("time")) {
+                  return value.toFixed(2) + " ms";
+                }
+                if (label.toLowerCase().includes("memory")) {
+                  return value.toFixed(2) + " MB";
+                }
+                return value;
+              },
+            },
+          },
+        },
+      });
+
+      document.getElementById("runBtn").addEventListener("click", async () => {
+        const btn = document.getElementById("runBtn");
+        const jsonOutput = document.getElementById("jsonOutput");
+
+        btn.disabled = true;
+        btn.textContent = "Running...";
+
+        try {
+          const res = await fetch("/benchmark");
+          if (!res.ok) throw new Error("Request failed");
+
+          const json = await res.json();
+          jsonOutput.textContent = JSON.stringify(json, null, 2);
+
+          chart.data.datasets[0].data = [json.dump.timeMs, json.stream.timeMs];
+          chart.data.datasets[1].data = [
+            json.dump.peakMemoryMB,
+            json.stream.peakMemoryMB,
+          ];
+          chart.data.datasets[2].data = [
+            json.dump.avgMemoryMB,
+            json.stream.avgMemoryMB,
+          ];
+          chart.update();
+        } catch (e) {
+          jsonOutput.textContent = "⚠️ Error: " + e.message;
+        }
+
+        btn.disabled = false;
+        btn.textContent = "Run Performance Test";
+      });
+    </script>
+  </body>
+</html>
